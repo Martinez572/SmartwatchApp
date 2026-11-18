@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Lee la API key desde local.properties (este archivo NO se sube a Git)
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val anthropicKey: String = localProperties.getProperty("ANTHROPIC_API_KEY", "")
 
 android {
     namespace = "com.example.smartwatchapp"
@@ -16,6 +27,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$anthropicKey\"")
     }
 
     buildTypes {
@@ -33,6 +45,7 @@ android {
     useLibrary("wear-sdk")
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
