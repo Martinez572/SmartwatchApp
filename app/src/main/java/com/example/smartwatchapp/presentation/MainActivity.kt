@@ -71,6 +71,9 @@ import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import com.example.smartwatchapp.presentation.theme.SmartwatchAppTheme
 import kotlinx.coroutines.delay
+// a) Nuevos imports para corrutinas en Compose
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 // =====================================================================
 //  COLORES: un solo color primario (violeta) + tonos neutros claros.
@@ -107,11 +110,11 @@ data class Step(
     val keywordCount: Int
 )
 
-// Todas las pantallas de la app
+// b) Todas las pantallas de la app (agregado AI_TEST al final)
 enum class Screen {
     HOME, DURATION, VIBRATIONS, REMINDER_EDIT, ASK_NOTES,
     SECTION_COUNT, SECTIONS, SECTION_EDIT, TEXT_INPUT,
-    PRESENTING, FINISHED
+    PRESENTING, FINISHED, AI_TEST
 }
 
 // Convierte las secciones en una lista plana de pasos
@@ -253,14 +256,17 @@ fun App() {
             Screen.SECTION_EDIT -> Screen.SECTIONS
             Screen.TEXT_INPUT -> textReturnTo
             Screen.PRESENTING -> Screen.PRESENTING // durante la exposición no se sale por accidente
+            Screen.AI_TEST -> Screen.HOME
             else -> Screen.HOME
         }
     }
 
     AppBackground {
         when (screen) {
+            // c) Actualizado Screen.HOME y agregado Screen.AI_TEST
             Screen.HOME -> HomeScreen(
-                onStart = { screen = Screen.DURATION }
+                onStart = { screen = Screen.DURATION },
+                onTestAi = { screen = Screen.AI_TEST }
             )
 
             Screen.DURATION -> DurationScreen(
@@ -437,6 +443,10 @@ fun App() {
 
             Screen.FINISHED -> FinishedScreen(
                 onHome = { screen = Screen.HOME }
+            )
+
+            Screen.AI_TEST -> AiTestScreen(
+                onBack = { screen = Screen.HOME }
             )
         }
     }
@@ -625,8 +635,9 @@ fun ProgressDots(current: Int, total: Int) {
 //  PANTALLAS DE CONFIGURACIÓN
 // =====================================================================
 
+// d) HomeScreen actualizado con el botón de prueba de IA
 @Composable
-fun HomeScreen(onStart: () -> Unit) {
+fun HomeScreen(onStart: () -> Unit, onTestAi: () -> Unit) {
     ListScreen {
         item {
             Text(text = "Hola 👋", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = ColorInk)
@@ -650,6 +661,7 @@ fun HomeScreen(onStart: () -> Unit) {
         }
         item { Spacer(modifier = Modifier.height(4.dp)) }
         item { PillButton("Comenzar exposición", onStart) }
+        item { PillButton("🧪 Probar IA", onTestAi, filled = false) }
     }
 }
 
@@ -954,7 +966,6 @@ fun PresentationScreen(
 
     val secondsLeft = ((remainingMs + 999) / 1000).toInt()
     val timeText = "%02d:%02d".format(secondsLeft / 60, secondsLeft % 60)
-    val progress = remainingMs / (totalSeconds * 1000f)
 
     Box(
         modifier = Modifier
@@ -992,7 +1003,7 @@ fun PresentationScreen(
             drawArc(
                 color = ColorPrimary,
                 startAngle = -90f,
-                sweepAngle = 360f * progress,
+                sweepAngle = 360f,
                 useCenter = false,
                 topLeft = Offset(inset, inset),
                 size = arcSize,
@@ -1166,5 +1177,48 @@ fun FinishedScreen(onHome: () -> Unit) {
         }
         item { Spacer(modifier = Modifier.height(4.dp)) }
         item { PillButton("Inicio", onHome) }
+    }
+}
+
+// =====================================================================
+//  e) PANTALLA TEMPORAL PARA PROBAR LA IA (Agregada al final)
+// =====================================================================
+
+@Composable
+fun AiTestScreen(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    var answer by remember { mutableStateOf("") }
+    ListScreen(title = "Prueba de IA") {
+        item {
+            PillButton(
+                text = if (loading) "Pensando…" else "Probar Claude",
+                onClick = {
+                    if (!loading) {
+                        loading = true
+                        answer = ""
+                        scope.launch {
+                            val result = askClaude(
+                                "Eres un coach de exposiciones. En una sola frase corta en español, " +
+                                        "dime si estás funcionando y dame un consejo para hablar en público."
+                            )
+                            answer = result.getOrElse { "Falló: ${it.message}" }
+                            loading = false
+                        }
+                    }
+                }
+            )
+        }
+        item {
+            if (answer.isNotEmpty()) {
+                Text(
+                    text = answer,
+                    fontSize = 12.sp,
+                    color = ColorInk,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        item { PillButton("Atrás", onBack, filled = false) }
     }
 }
